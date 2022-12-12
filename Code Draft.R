@@ -21,7 +21,7 @@ options(scipen = 10)
 scores <- read_csv("spreadspoke_scores.csv")
 
 ### Filter to include only games from the 2000-2022 Seasons:
-scores <- scores %>% filter(between(schedule_season, 2000, 2020))
+scores <- scores %>% filter(between(schedule_season, 2010, 2020))
 
 ### Various Data Cleaning:
 scores <- scores %>% mutate(schedule_date = mdy(schedule_date)) #Date Formatting
@@ -117,7 +117,7 @@ by_team_plot <- by_team %>%
 by_team_plot
 
 
-team_differential_plot <- by_team %>% 
+team_differential_plot <- by_team %>% filter(team_home != "Las Vegas Raiders") %>%
   ggplot(aes(x = reorder(team_home, +home_away_differential), y = home_away_differential)) +
   labs(title = "Difference in % of Home v. Away Games Won by Each NFL Team",
        x = 'Team',
@@ -141,17 +141,18 @@ summary(model1)
 team_names <- data.frame(unique(scores$team_home))
 
 
-#Attendance Data
+#Attendance Data (NOT USED)
 
 attendance <- read_csv("attendance_final.csv")
 
 scores_attendance <- full_join(scores, attendance, by = "team_home", all.x = TRUE)
 
 
-#Neural Network 
+#Naive Bayes
 
 scores_factor <- lapply(scores,as.factor) %>% data.frame()
-
+scores_factor <- scores_factor %>% select(-score_home, -score_away, -home_win, 
+                         -away_win, -away_win_binary, -spread_favorite)
 
 partition <- sample(c('train','test'), size = nrow(scores_factor), replace = TRUE, prob = c(.75,.25))
 
@@ -167,32 +168,29 @@ set.seed(1)
 scores_nb <- naiveBayes(home_win_binary~. ,data=d_scores_train)
 
 scores_nb_train <- mutate(d_scores_train, 
-                       Prediction = predict(scores_nb, d_scores_train,type="class")) #dplyr
+                       Prediction = predict(scores_nb, d_scores_train,type="class")) 
 
 #Compute/display the Percentage Correct in the training data to evaluate accuracy.
 mean(~(home_win_binary == Prediction), data=scores_nb_train)
-tally(~(home_win_binary == Prediction), data=scores_nb_train) %>% addmargins() #mosaic
+tally(~(home_win_binary == Prediction), data=scores_nb_train) %>% addmargins() 
 #Classification Table of percentages of training data.
 tally(home_win_binary ~ Prediction, data=scores_nb_train) %>% 
-  prop.table(margin=1) %>% round(2) #mosaic      
-
+  prop.table(margin=1) %>% round(2) 
 
 
 ### TEST THE NAIVE BAYES MODEL WITH TEST DATA
 
 #Evaluate Accuracy:  How good is the model on the test data? 
 #Add the predicted values to the test data frame.
-#round(): round estimated probabilities to get 0 or 1.
 scores_nb_test <- mutate(d_scores_test, 
-                      Prediction = predict(scores_nb, d_scores_test,type="class")) #dplyr
+                      Prediction = predict(scores_nb, d_scores_test,type="class")) 
 
 #Compute/display the Percentage Correct in test data to evaluate accuracy.
 mean(~(home_win_binary == Prediction), data=scores_nb_test)
-tally(~(home_win_binary == Prediction), data=scores_nb_test) %>% addmargins() #mosaic
+tally(~(home_win_binary == Prediction), data=scores_nb_test) %>% addmargins() 
 #Classification Table of percentages of training data.
 tally(home_win_binary ~ Prediction, data=scores_nb_test) %>% 
-  prop.table(margin=1) %>% round(2) #mosaic      
-
+  prop.table(margin=1) %>% round(2) 
 
 
 
